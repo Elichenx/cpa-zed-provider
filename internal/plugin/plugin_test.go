@@ -674,6 +674,33 @@ func TestOpenAIModelProbeRespectsResponsesMinimum(t *testing.T) {
 	}
 }
 
+func TestGeminiThinkingLevelUsesZedEnum(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/client/llm_tokens" {
+			io.WriteString(w, `{"token":"dummy-token"}`)
+			return
+		}
+		var body struct {
+			Request map[string]any `json:"provider_request"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+			return
+		}
+		generation, _ := body.Request["generationConfig"].(map[string]any)
+		thinking, _ := generation["thinkingConfig"].(map[string]any)
+		if thinking["thinkingLevel"] != "HIGH" {
+			t.Errorf("Zed rejects lowercase thinkingLevel: %+v", thinking)
+		}
+		io.WriteString(w, `{"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]},"finishReason":"STOP"}]}`)
+	}))
+	defer server.Close()
+	app := testApp(t, server.URL)
+	req := completionRequest("zed/google/gemini-4-argon")
+	req["Payload"] = []byte(`{"messages":[{"role":"user","content":"hi"}],"reasoning_effort":"high"}`)
+	rpc(t, app, "executor.execute", req, nil)
+}
+
 func TestOtherUpstreamProviders(t *testing.T) {
 	for _, tc := range []struct{ model, provider, response string }{
 		{"zed/open_ai/gpt-4.1", "open_ai", `{"type":"response.completed","response":{"id":"resp_test","model":"gpt-4.1","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello"}]}],"usage":{"input_tokens":4,"output_tokens":2,"total_tokens":6}}}`},

@@ -126,6 +126,17 @@ func prepare(req request, spec *zedModel) (completion, error) {
 				calling["mode"] = strings.ToLower(mode)
 			}
 		}
+		// Zed deserializes ThinkingLevel as MINIMAL/LOW/MEDIUM/HIGH. Chat clients send lowercase efforts.
+		if generation, ok := upstream["generationConfig"].(map[string]any); ok {
+			if thinking, ok := generation["thinkingConfig"].(map[string]any); ok {
+				if level, ok := thinking["thinkingLevel"].(string); ok {
+					switch strings.ToLower(strings.TrimSpace(level)) {
+					case "minimal", "low", "medium", "high":
+						thinking["thinkingLevel"] = strings.ToUpper(strings.TrimSpace(level))
+					}
+				}
+			}
+		}
 	} else {
 		// Zed serves native events; execute collects them for non-streaming clients.
 		upstream["stream"] = req.Stream || provider == "anthropic" || provider == "open_ai"
