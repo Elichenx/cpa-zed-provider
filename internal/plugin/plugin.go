@@ -13,7 +13,7 @@ import (
 )
 
 const ABIVersion = 1
-const Version = "0.1.6"
+const Version = "0.1.7"
 
 type HostCaller func(string, any) (json.RawMessage, error)
 
